@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.OData;
 using Microsoft.OData.ModelBuilder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
+using Microsoft.AspNetCore.OData.Formatter;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -1363,4 +1364,15 @@ public class QuarterlyReportsController : ControllerBase
 
     [EnableQuery]
     public IActionResult Get() => Ok(Reports);
+
+    [EnableQuery]
+    public IActionResult Get([FromODataUri] string key)
+    {
+        var report = Reports.FirstOrDefault(r => r.Id == key);
+        if (report == null)
+        {
+            return NotFound();
+        }
+        return Ok(report);
+    }
 }
