@@ -24,8 +24,15 @@ app.Run();
 static Microsoft.OData.Edm.IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
-    builder.EntitySet<QuarterlyReport>("QuarterlyReports");
-    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns"); // <-- Add this line
+
+    var quarterlyReport = builder.EntitySet<QuarterlyReport>("QuarterlyReports").EntityType;
+    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns");
+    builder.EntitySet<Kpi>("Kpis");
+
+    // Define navigations
+    quarterlyReport.HasMany(q => q.MonthlyData).Contained();
+    quarterlyReport.HasMany(q => q.KPIs).Contained();
+
     return builder.GetEdmModel();
 }
 
@@ -44,21 +51,22 @@ public class QuarterlyReport
     public List<Kpi> KPIs { get; set; } = new();
 }
 
+
 public class MonthlyBreakdown
 {
-    [Key]  // <-- Add this
-    public int Id { get; set; }  // <-- Add this
-
+    [Key]
+    public string Id { get; set; } = Guid.NewGuid().ToString(); // Add a unique ID
+    public string? QuarterlyReportId { get; set; } // Link back to parent
     public string Month { get; set; } = string.Empty;
     public decimal Revenue { get; set; }
     public decimal Expenses { get; set; }
-
-    // (Optional but better relational modeling:)
-    public string? QuarterlyReportId { get; set; }
 }
 
 public class Kpi
 {
+    [Key]
+    public string Id { get; set; } = Guid.NewGuid().ToString(); // Add a unique ID
+    public string? QuarterlyReportId { get; set; } // Link back to parent
     public string Name { get; set; } = string.Empty;
     public decimal Value { get; set; }
     public string Unit { get; set; } = string.Empty;
