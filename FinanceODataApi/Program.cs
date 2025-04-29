@@ -1,16 +1,18 @@
-// Program.cs (.NET 8 style with OData)
+// Program.cs (Fixed version allowing $expand=MonthlyData($select=...))
 
+global using FinanceODataApi;
 using Microsoft.AspNetCore.OData;
 using Microsoft.OData.ModelBuilder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Formatter;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddOData(opt =>
-    opt.Select().Filter().OrderBy().Count().SetMaxTop(100)
+    opt.Select().Filter().OrderBy().Expand().Count().SetMaxTop(100)
         .AddRouteComponents("odata", GetEdmModel()));
 
 var app = builder.Build();
@@ -23,22 +25,16 @@ app.Run();
 
 static Microsoft.OData.Edm.IEdmModel GetEdmModel()
 {
-    var builder = new ODataConventionModelBuilder();
+var builder = new ODataConventionModelBuilder();
 
-    // Define entity types and sets
-    var quarterlyReport = builder.EntitySet<QuarterlyReport>("QuarterlyReports").EntityType;
-    var monthlyBreakdown = builder.EntityType<MonthlyBreakdown>();
-    var kpi = builder.EntityType<Kpi>();
+builder.EntitySet<QuarterlyReport>("QuarterlyReports");
+builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns"); // <-- NEW: top-level entity set
+builder.EntitySet<Kpi>("KPIs"); // <-- NEW: top-level entity set
 
-    // Define contained navigation properties
-    quarterlyReport.HasMany(q => q.MonthlyData).Contained();
-    quarterlyReport.HasMany(q => q.KPIs).Contained();
-
-    return builder.GetEdmModel();
+return builder.GetEdmModel();
 }
 
-
-// Model
+// Models
 public class QuarterlyReport
 {
     public string Id { get; set; } = string.Empty;
@@ -50,19 +46,21 @@ public class QuarterlyReport
     public decimal Profit { get; set; }
     public List<string> Metrics { get; set; } = new();
 
-    [Contained]
     public virtual IList<MonthlyBreakdown> MonthlyData { get; set; } = new List<MonthlyBreakdown>();
-
-    [Contained]
     public virtual IList<Kpi> KPIs { get; set; } = new List<Kpi>();
 }
-
 
 public class MonthlyBreakdown
 {
     [Key]
-    public string Id { get; set; } = Guid.NewGuid().ToString(); // Add a unique ID
-    public string? QuarterlyReportId { get; set; } // Link back to parent
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    [Required]
+    public string QuarterlyReportId { get; set; } = string.Empty;
+
+    [ForeignKey(nameof(QuarterlyReportId))]
+    public QuarterlyReport? QuarterlyReport { get; set; } // optional for now
+
     public string Month { get; set; } = string.Empty;
     public decimal Revenue { get; set; }
     public decimal Expenses { get; set; }
@@ -71,8 +69,14 @@ public class MonthlyBreakdown
 public class Kpi
 {
     [Key]
-    public string Id { get; set; } = Guid.NewGuid().ToString(); // Add a unique ID
-    public string? QuarterlyReportId { get; set; } // Link back to parent
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    [Required]
+    public string QuarterlyReportId { get; set; } = string.Empty;
+
+    [ForeignKey(nameof(QuarterlyReportId))]
+    public QuarterlyReport? QuarterlyReport { get; set; } // optional for now
+
     public string Name { get; set; } = string.Empty;
     public decimal Value { get; set; }
     public string Unit { get; set; } = string.Empty;
@@ -1383,6 +1387,11 @@ public class QuarterlyReportsController : ControllerBase
             }
         }
     };
+
+    static QuarterlyReportsController()
+    {
+        DataFixer.FixQuarterlyReportIds(Reports);
+    }
 
     [EnableQuery]
     public IActionResult Get() => Ok(Reports);
