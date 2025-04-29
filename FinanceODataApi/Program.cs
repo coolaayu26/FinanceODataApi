@@ -25,16 +25,18 @@ static Microsoft.OData.Edm.IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
 
+    // Define entity types and sets
     var quarterlyReport = builder.EntitySet<QuarterlyReport>("QuarterlyReports").EntityType;
-    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns");
-    builder.EntitySet<Kpi>("Kpis");
+    var monthlyBreakdown = builder.EntityType<MonthlyBreakdown>();
+    var kpi = builder.EntityType<Kpi>();
 
-    // Define navigations
+    // Define contained navigation properties
     quarterlyReport.HasMany(q => q.MonthlyData).Contained();
     quarterlyReport.HasMany(q => q.KPIs).Contained();
 
     return builder.GetEdmModel();
 }
+
 
 // Model
 public class QuarterlyReport
