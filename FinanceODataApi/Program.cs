@@ -47,7 +47,11 @@ public class QuarterlyReport
     public decimal Expenses { get; set; }
     public decimal Profit { get; set; }
     public List<string> Metrics { get; set; } = new();
+
+    [Contained]    //  ADD THIS
     public List<MonthlyBreakdown> MonthlyData { get; set; } = new();
+
+    [Contained]    //  ADD THIS
     public List<Kpi> KPIs { get; set; } = new();
 }
 
