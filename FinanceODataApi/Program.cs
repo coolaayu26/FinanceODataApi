@@ -5,6 +5,7 @@ using Microsoft.OData.ModelBuilder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Formatter;
+using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,7 @@ static Microsoft.OData.Edm.IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
     builder.EntitySet<QuarterlyReport>("QuarterlyReports");
+    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns"); // <-- Add this line
     return builder.GetEdmModel();
 }
 
@@ -44,9 +46,15 @@ public class QuarterlyReport
 
 public class MonthlyBreakdown
 {
+    [Key]  // <-- Add this
+    public int Id { get; set; }  // <-- Add this
+
     public string Month { get; set; } = string.Empty;
     public decimal Revenue { get; set; }
     public decimal Expenses { get; set; }
+
+    // (Optional but better relational modeling:)
+    public string? QuarterlyReportId { get; set; }
 }
 
 public class Kpi
