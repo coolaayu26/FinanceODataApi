@@ -50,11 +50,11 @@ public class QuarterlyReport
     public decimal Profit { get; set; }
     public List<string> Metrics { get; set; } = new();
 
-    [Contained]    //  ADD THIS
-    public List<MonthlyBreakdown> MonthlyData { get; set; } = new();
+    [Contained]
+    public virtual IList<MonthlyBreakdown> MonthlyData { get; set; } = new List<MonthlyBreakdown>();
 
-    [Contained]    //  ADD THIS
-    public List<Kpi> KPIs { get; set; } = new();
+    [Contained]
+    public virtual IList<Kpi> KPIs { get; set; } = new List<Kpi>();
 }
 
 
