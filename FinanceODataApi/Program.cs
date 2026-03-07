@@ -13,9 +13,13 @@ builder.Services.AddControllers().AddOData(opt =>
     opt.Select().Filter().OrderBy().Expand().Count().SetMaxTop(1000)
         .AddRouteComponents("odata", GetEdmModel()));
 
+builder.Services.AddCors(options => options.AddDefaultPolicy(
+    policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+
 var app = builder.Build();
 
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthorization();
 app.MapControllers();
 
