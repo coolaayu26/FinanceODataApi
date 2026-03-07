@@ -4,11 +4,12 @@ using Microsoft.AspNetCore.OData;
 using Microsoft.OData.ModelBuilder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
+using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers().AddOData(opt =>
-    opt.Select().Filter().OrderBy().Count().SetMaxTop(100)
+    opt.Select().Filter().OrderBy().Expand().Count().SetMaxTop(1000)
         .AddRouteComponents("odata", GetEdmModel()));
 
 var app = builder.Build();
@@ -23,12 +24,18 @@ static Microsoft.OData.Edm.IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
     builder.EntitySet<QuarterlyReport>("QuarterlyReports");
+    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns");
+    builder.EntitySet<Kpi>("KPIs");
+    builder.EntitySet<RegionEntity>("Regions");
+    builder.EntitySet<DepartmentEntity>("Departments");
+    builder.EntitySet<QuarterEntity>("Quarters");
     return builder.GetEdmModel();
 }
 
-// Model
+// Models
 public class QuarterlyReport
 {
+    [Key]
     public int Id { get; set; }
     public string Quarter { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
@@ -36,27 +43,105 @@ public class QuarterlyReport
     public decimal Revenue { get; set; }
     public decimal Expenses { get; set; }
     public decimal Profit { get; set; }
+    public List<string> Metrics { get; set; } = new();
+    public List<MonthlyBreakdown> MonthlyData { get; set; } = new();
+    public List<Kpi> KPIs { get; set; } = new();
 }
 
-// Controller
+public class MonthlyBreakdown
+{
+    [Key]
+    public string Id { get; set; } = string.Empty;
+    public int QuarterlyReportId { get; set; }
+    public string Month { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+}
+
+public class Kpi
+{
+    [Key]
+    public string Id { get; set; } = string.Empty;
+    public int QuarterlyReportId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Value { get; set; }
+    public decimal Target { get; set; }
+}
+
+public class RegionEntity
+{
+    [Key]
+    public int Id { get; set; }
+    public string Region { get; set; } = string.Empty;
+}
+
+public class DepartmentEntity
+{
+    [Key]
+    public int Id { get; set; }
+    public string Department { get; set; } = string.Empty;
+}
+
+public class QuarterEntity
+{
+    [Key]
+    public int Id { get; set; }
+    public string Quarter { get; set; } = string.Empty;
+}
+
+// Controllers
 public class QuarterlyReportsController : ControllerBase
 {
-    private static readonly List<QuarterlyReport> Reports = new()
-    {
-        new() { Id = 1, Quarter = "Q1-2024", Department = "Sales", Region = "North America", Revenue = 120000, Expenses = 80000, Profit = 40000 },
-        new() { Id = 2, Quarter = "Q1-2024", Department = "Marketing", Region = "Europe", Revenue = 90000, Expenses = 60000, Profit = 30000 },
-        new() { Id = 3, Quarter = "Q2-2024", Department = "Sales", Region = "North America", Revenue = 140000, Expenses = 85000, Profit = 55000 },
-        new() { Id = 4, Quarter = "Q2-2024", Department = "Marketing", Region = "Europe", Revenue = 95000, Expenses = 65000, Profit = 30000 },
-        new() { Id = 5, Quarter = "Q3-2024", Department = "Sales", Region = "Asia", Revenue = 135000, Expenses = 87000, Profit = 48000 },
-        new() { Id = 6, Quarter = "Q3-2024", Department = "Marketing", Region = "Asia", Revenue = 97000, Expenses = 62000, Profit = 35000 },
-        new() { Id = 7, Quarter = "Q4-2024", Department = "Sales", Region = "North America", Revenue = 150000, Expenses = 95000, Profit = 55000 },
-        new() { Id = 8, Quarter = "Q4-2024", Department = "Marketing", Region = "Europe", Revenue = 105000, Expenses = 70000, Profit = 35000 },
-        new() { Id = 9, Quarter = "Q1-2024", Department = "Support", Region = "North America", Revenue = 50000, Expenses = 30000, Profit = 20000 },
-        new() { Id = 10, Quarter = "Q2-2024", Department = "Support", Region = "Asia", Revenue = 60000, Expenses = 35000, Profit = 25000 },
-        new() { Id = 11, Quarter = "Q3-2024", Department = "Support", Region = "Europe", Revenue = 55000, Expenses = 33000, Profit = 22000 },
-        new() { Id = 12, Quarter = "Q4-2024", Department = "Support", Region = "North America", Revenue = 58000, Expenses = 34000, Profit = 24000 },
-    };
+    [EnableQuery]
+    public IActionResult Get() => Ok(FinanceDataStore.Reports);
 
     [EnableQuery]
-    public IActionResult Get() => Ok(Reports);
+    public IActionResult Get([FromRoute] int key)
+    {
+        var report = FinanceDataStore.Reports.FirstOrDefault(r => r.Id == key);
+        if (report == null) return NotFound();
+        return Ok(report);
+    }
+}
+
+public class RegionsController : ControllerBase
+{
+    [EnableQuery]
+    public IActionResult Get() => Ok(FinanceDataStore.Regions);
+
+    [EnableQuery]
+    public IActionResult Get([FromRoute] int key)
+    {
+        var region = FinanceDataStore.Regions.FirstOrDefault(r => r.Id == key);
+        if (region == null) return NotFound();
+        return Ok(region);
+    }
+}
+
+public class DepartmentsController : ControllerBase
+{
+    [EnableQuery]
+    public IActionResult Get() => Ok(FinanceDataStore.Departments);
+
+    [EnableQuery]
+    public IActionResult Get([FromRoute] int key)
+    {
+        var department = FinanceDataStore.Departments.FirstOrDefault(d => d.Id == key);
+        if (department == null) return NotFound();
+        return Ok(department);
+    }
+}
+
+public class QuartersController : ControllerBase
+{
+    [EnableQuery]
+    public IActionResult Get() => Ok(FinanceDataStore.Quarters);
+
+    [EnableQuery]
+    public IActionResult Get([FromRoute] int key)
+    {
+        var quarter = FinanceDataStore.Quarters.FirstOrDefault(q => q.Id == key);
+        if (quarter == null) return NotFound();
+        return Ok(quarter);
+    }
 }

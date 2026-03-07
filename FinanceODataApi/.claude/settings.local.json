@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/AayushAggarwal/source/repos/coolaayu26/FinanceODataApi/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
