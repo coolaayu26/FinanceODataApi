@@ -1,4 +1,6 @@
-public static class FinanceDataStore
+namespace FinanceODataApi
+{
+    public static class FinanceDataStore
 {
     public static readonly List<QuarterlyReport> Reports = new()
     {
@@ -851,4 +853,5 @@ public static class FinanceDataStore
         })
         .Select((q, index) => new QuarterEntity { Id = index + 1, Quarter = q })
         .ToList();
+}
 }

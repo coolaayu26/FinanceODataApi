@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/AayushAggarwal/source/repos/coolaayu26/FinanceODataApi/**)"
+      "Read(//c/Users/AayushAggarwal/source/repos/coolaayu26/FinanceODataApi/**)",
+      "Bash(git checkout:*)",
+      "Bash(dotnet build:*)"
     ],
     "deny": [],
     "ask": []

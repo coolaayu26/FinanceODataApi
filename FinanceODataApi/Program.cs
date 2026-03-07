@@ -1,5 +1,6 @@
 // Program.cs (.NET 8 style with OData)
 
+global using FinanceODataApi;
 using Microsoft.AspNetCore.OData;
 using Microsoft.OData.ModelBuilder;
 using Microsoft.AspNetCore.Mvc;
