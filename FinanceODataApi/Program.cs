@@ -29,11 +29,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// FIX 1: CORS middleware placement - MUST be before UseRouting and UseAuthorization
+// Middleware order for Templafy compatibility
 app.UseHttpsRedirection();
 app.UseCors();
 
-// FIX 3: OData response headers middleware
+// OData response headers
 app.Use(async (context, next) =>
 {
     await next();
@@ -54,55 +54,48 @@ static IEdmModel GetEdmModel()
 {
     var builder = new ODataConventionModelBuilder();
 
-    // Register existing entity sets
-    var reportsSet = builder.EntitySet<QuarterlyReport>("QuarterlyReports");
-    builder.EntitySet<MonthlyBreakdown>("MonthlyBreakdowns");
-    builder.EntitySet<QuarterlyBreakdown>("QuarterlyBreakdowns");
-    builder.EntitySet<Kpi>("KPIs");
-    builder.EntitySet<RegionEntity>("Regions");
-    builder.EntitySet<DepartmentEntity>("Departments");
-    builder.EntitySet<YearEntity>("Years");
-    builder.EntitySet<SegmentEntity>("Segments");
+    // Register nested array types as ComplexTypes (NOT entity sets)
+    builder.ComplexType<DepartmentDataItem>();
+    builder.ComplexType<RegionDataItem>();
+    builder.ComplexType<MonthlyDataItem>();
+    builder.ComplexType<QuarterlyDataItem>();
+    builder.ComplexType<YearlyDataItem>();
+    builder.ComplexType<SegmentDataItem>();
+    builder.ComplexType<KpiDataItem>();
 
-    // Configure navigation property bindings
-    reportsSet.HasManyBinding(r => r.MonthlyData, "MonthlyBreakdowns");
-    reportsSet.HasManyBinding(r => r.QuarterlyData, "QuarterlyBreakdowns");
-    reportsSet.HasManyBinding(r => r.KPIs, "KPIs");
-
-    // FIX 4: Register pre-aggregated view entity sets for Templafy charts
-    builder.EntitySet<RevenueByDepartment>("Revenue_by_Department");
-    builder.EntitySet<RevenueByMonth>("Revenue_by_Month");
-    builder.EntitySet<RevenueByQuarter>("Revenue_by_Quarter");
-    builder.EntitySet<RevenueByYear>("Revenue_by_Year");
-    builder.EntitySet<KpiSummary>("KPI_Summary");
+    // Register top-level summary entity sets (one record per dimension value)
+    builder.EntitySet<RegionSummary>("RegionSummaries");
+    builder.EntitySet<DepartmentSummary>("DepartmentSummaries");
+    builder.EntitySet<YearSummary>("YearSummaries");
+    builder.EntitySet<SegmentSummary>("SegmentSummaries");
 
     return builder.GetEdmModel();
 }
 
-// ============= Models =============
+// ============= NESTED ARRAY MODELS (ComplexTypes) =============
 
-// FIX 2: Changed all non-key string properties to nullable (string?)
-public class QuarterlyReport
+public class DepartmentDataItem
 {
-    [Key] public int Id { get; set; }
-    public string? Region { get; set; }
     public string? Department { get; set; }
-    public string? Year { get; set; }
-    public string? Segment { get; set; }
-    public decimal AnnualRevenue { get; set; }
-    public decimal AnnualExpenses { get; set; }
-    public decimal AnnualProfit { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+    public decimal Profit { get; set; }
     public decimal GrowthRate { get; set; }
     public int HeadCount { get; set; }
-    public virtual IList<MonthlyBreakdown> MonthlyData { get; set; } = new List<MonthlyBreakdown>();
-    public virtual IList<QuarterlyBreakdown> QuarterlyData { get; set; } = new List<QuarterlyBreakdown>();
-    public virtual IList<Kpi> KPIs { get; set; } = new List<Kpi>();
 }
 
-public class MonthlyBreakdown
+public class RegionDataItem
 {
-    [Key] public string Id { get; set; } = string.Empty;
-    public int QuarterlyReportId { get; set; }
+    public string? Region { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+    public decimal Profit { get; set; }
+    public decimal GrowthRate { get; set; }
+    public int HeadCount { get; set; }
+}
+
+public class MonthlyDataItem
+{
     public string? Month { get; set; }
     public int MonthIndex { get; set; }
     public decimal Revenue { get; set; }
@@ -110,10 +103,8 @@ public class MonthlyBreakdown
     public decimal Profit { get; set; }
 }
 
-public class QuarterlyBreakdown
+public class QuarterlyDataItem
 {
-    [Key] public string Id { get; set; } = string.Empty;
-    public int QuarterlyReportId { get; set; }
     public string? Quarter { get; set; }
     public int QuarterIndex { get; set; }
     public decimal Revenue { get; set; }
@@ -121,247 +112,143 @@ public class QuarterlyBreakdown
     public decimal Profit { get; set; }
 }
 
-public class Kpi
+public class YearlyDataItem
 {
-    [Key] public string Id { get; set; } = string.Empty;
-    public int QuarterlyReportId { get; set; }
+    public string? Year { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+    public decimal Profit { get; set; }
+}
+
+public class SegmentDataItem
+{
+    public string? Segment { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+    public decimal Profit { get; set; }
+}
+
+public class KpiDataItem
+{
+    public string? Department { get; set; }
     public string? Name { get; set; }
     public decimal Value { get; set; }
     public string? Unit { get; set; }
 }
 
-public class RegionEntity
+// ============= TOP-LEVEL ENTITY MODELS (One record per dimension value) =============
+
+// 6 records - user picks region, gets all chart arrays for that region
+public class RegionSummary
 {
     [Key] public int Id { get; set; }
     public string? Region { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal TotalProfit { get; set; }
+
+    // Arrays for charts - aggregated across ALL years, segments, departments
+    public IList<DepartmentDataItem> DepartmentData { get; set; } = new List<DepartmentDataItem>();  // pie chart (6 items)
+    public IList<MonthlyDataItem> MonthlyTotals { get; set; } = new List<MonthlyDataItem>();        // line chart (12 items)
+    public IList<QuarterlyDataItem> QuarterlyTotals { get; set; } = new List<QuarterlyDataItem>();  // bar chart (4 items)
+    public IList<YearlyDataItem> YearlyTotals { get; set; } = new List<YearlyDataItem>();          // YoY trend (4 items)
+    public IList<SegmentDataItem> SegmentData { get; set; } = new List<SegmentDataItem>();         // segment split (2 items)
+    public IList<KpiDataItem> KPIs { get; set; } = new List<KpiDataItem>();                        // KPI table
 }
 
-public class DepartmentEntity
+// 6 records - user picks department, gets all chart arrays for that department
+public class DepartmentSummary
 {
     [Key] public int Id { get; set; }
     public string? Department { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal TotalProfit { get; set; }
+
+    public IList<RegionDataItem> RegionData { get; set; } = new List<RegionDataItem>();             // pie chart (6 items)
+    public IList<MonthlyDataItem> MonthlyTotals { get; set; } = new List<MonthlyDataItem>();        // line chart (12 items)
+    public IList<QuarterlyDataItem> QuarterlyTotals { get; set; } = new List<QuarterlyDataItem>();  // bar chart (4 items)
+    public IList<YearlyDataItem> YearlyTotals { get; set; } = new List<YearlyDataItem>();          // YoY trend (4 items)
+    public IList<SegmentDataItem> SegmentData { get; set; } = new List<SegmentDataItem>();         // segment split (2 items)
+    public IList<KpiDataItem> KPIs { get; set; } = new List<KpiDataItem>();                        // KPI table
 }
 
-public class YearEntity
+// 4 records - user picks year, gets all chart arrays for that year
+public class YearSummary
 {
     [Key] public int Id { get; set; }
     public string? Year { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal TotalExpenses { get; set; }
+    public decimal TotalProfit { get; set; }
+
+    public IList<RegionDataItem> RegionData { get; set; } = new List<RegionDataItem>();             // pie chart (6 items)
+    public IList<DepartmentDataItem> DepartmentData { get; set; } = new List<DepartmentDataItem>();  // bar chart (6 items)
+    public IList<MonthlyDataItem> MonthlyTotals { get; set; } = new List<MonthlyDataItem>();        // line chart (12 items)
+    public IList<QuarterlyDataItem> QuarterlyTotals { get; set; } = new List<QuarterlyDataItem>();  // grouped bar (4 items)
+    public IList<SegmentDataItem> SegmentData { get; set; } = new List<SegmentDataItem>();         // segment split (2 items)
+    public IList<KpiDataItem> KPIs { get; set; } = new List<KpiDataItem>();                        // KPI table
 }
 
-public class SegmentEntity
+// 2 records - user picks segment, gets all chart arrays for that segment
+public class SegmentSummary
 {
     [Key] public int Id { get; set; }
-    public string? Segment { get; set; }
-}
-
-// FIX 4: Pre-aggregated view models for Templafy charts
-public class RevenueByDepartment
-{
-    [Key] public string Id { get; set; } = string.Empty;
-    public string? Region { get; set; }
-    public string? Year { get; set; }
-    public string? Segment { get; set; }
-    public string? Department { get; set; }
-    public decimal AnnualRevenue { get; set; }
-    public decimal AnnualExpenses { get; set; }
-    public decimal AnnualProfit { get; set; }
-    public decimal GrowthRate { get; set; }
-    public int HeadCount { get; set; }
-}
-
-public class RevenueByMonth
-{
-    [Key] public string Id { get; set; } = string.Empty;
-    public string? Region { get; set; }
-    public string? Year { get; set; }
-    public string? Segment { get; set; }
-    public string? Month { get; set; }
-    public int MonthIndex { get; set; }
-    public decimal Revenue { get; set; }
-    public decimal Expenses { get; set; }
-    public decimal Profit { get; set; }
-}
-
-public class RevenueByQuarter
-{
-    [Key] public string Id { get; set; } = string.Empty;
-    public string? Region { get; set; }
-    public string? Year { get; set; }
-    public string? Segment { get; set; }
-    public string? Quarter { get; set; }
-    public int QuarterIndex { get; set; }
-    public decimal Revenue { get; set; }
-    public decimal Expenses { get; set; }
-    public decimal Profit { get; set; }
-}
-
-public class RevenueByYear
-{
-    [Key] public string Id { get; set; } = string.Empty;
-    public string? Region { get; set; }
-    public string? Year { get; set; }
     public string? Segment { get; set; }
     public decimal TotalRevenue { get; set; }
     public decimal TotalExpenses { get; set; }
     public decimal TotalProfit { get; set; }
-    public decimal AvgGrowthRate { get; set; }
-    public int TotalHeadCount { get; set; }
+
+    public IList<RegionDataItem> RegionData { get; set; } = new List<RegionDataItem>();             // pie chart (6 items)
+    public IList<DepartmentDataItem> DepartmentData { get; set; } = new List<DepartmentDataItem>();  // bar chart (6 items)
+    public IList<MonthlyDataItem> MonthlyTotals { get; set; } = new List<MonthlyDataItem>();        // line chart (12 items)
+    public IList<QuarterlyDataItem> QuarterlyTotals { get; set; } = new List<QuarterlyDataItem>();  // grouped bar (4 items)
+    public IList<YearlyDataItem> YearlyTotals { get; set; } = new List<YearlyDataItem>();          // YoY trend (4 items)
+    public IList<KpiDataItem> KPIs { get; set; } = new List<KpiDataItem>();                        // KPI table
 }
 
-public class KpiSummary
-{
-    [Key] public string Id { get; set; } = string.Empty;
-    public string? Region { get; set; }
-    public string? Year { get; set; }
-    public string? Segment { get; set; }
-    public string? Department { get; set; }
-    public string? KpiName { get; set; }
-    public decimal KpiValue { get; set; }
-    public string? Unit { get; set; }
-}
+// ============= CONTROLLERS =============
 
-// ============= Controllers =============
-
-public class QuarterlyReportsController : ODataController
+public class RegionSummariesController : ODataController
 {
     [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Reports);
+    public IActionResult Get() => Ok(FinanceDataStore.RegionSummaries);
 
     [EnableQuery]
     public IActionResult Get(int key) =>
-        FinanceDataStore.Reports.FirstOrDefault(r => r.Id == key) is { } r
+        FinanceDataStore.RegionSummaries.FirstOrDefault(r => r.Id == key) is { } r
             ? Ok(r) : NotFound();
 }
 
-public class MonthlyBreakdownsController : ODataController
+public class DepartmentSummariesController : ODataController
 {
     [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Reports.SelectMany(r => r.MonthlyData));
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.Reports.SelectMany(r => r.MonthlyData).FirstOrDefault(m => m.Id == key) is { } m
-            ? Ok(m) : NotFound();
-}
-
-public class QuarterlyBreakdownsController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Reports.SelectMany(r => r.QuarterlyData));
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.Reports.SelectMany(r => r.QuarterlyData).FirstOrDefault(q => q.Id == key) is { } q
-            ? Ok(q) : NotFound();
-}
-
-public class KPIsController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Reports.SelectMany(r => r.KPIs));
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.Reports.SelectMany(r => r.KPIs).FirstOrDefault(k => k.Id == key) is { } k
-            ? Ok(k) : NotFound();
-}
-
-public class RegionsController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Regions);
+    public IActionResult Get() => Ok(FinanceDataStore.DepartmentSummaries);
 
     [EnableQuery]
     public IActionResult Get(int key) =>
-        FinanceDataStore.Regions.FirstOrDefault(r => r.Id == key) is { } r
-            ? Ok(r) : NotFound();
-}
-
-public class DepartmentsController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Departments);
-
-    [EnableQuery]
-    public IActionResult Get(int key) =>
-        FinanceDataStore.Departments.FirstOrDefault(d => d.Id == key) is { } d
+        FinanceDataStore.DepartmentSummaries.FirstOrDefault(d => d.Id == key) is { } d
             ? Ok(d) : NotFound();
 }
 
-public class YearsController : ODataController
+public class YearSummariesController : ODataController
 {
     [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Years);
+    public IActionResult Get() => Ok(FinanceDataStore.YearSummaries);
 
     [EnableQuery]
     public IActionResult Get(int key) =>
-        FinanceDataStore.Years.FirstOrDefault(y => y.Id == key) is { } y
+        FinanceDataStore.YearSummaries.FirstOrDefault(y => y.Id == key) is { } y
             ? Ok(y) : NotFound();
 }
 
-public class SegmentsController : ODataController
+public class SegmentSummariesController : ODataController
 {
     [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.Segments);
+    public IActionResult Get() => Ok(FinanceDataStore.SegmentSummaries);
 
     [EnableQuery]
     public IActionResult Get(int key) =>
-        FinanceDataStore.Segments.FirstOrDefault(s => s.Id == key) is { } s
+        FinanceDataStore.SegmentSummaries.FirstOrDefault(s => s.Id == key) is { } s
             ? Ok(s) : NotFound();
-}
-
-// FIX 4: Controllers for pre-aggregated views
-public class Revenue_by_DepartmentController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.RevenueByDepartment);
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.RevenueByDepartment.FirstOrDefault(r => r.Id == key) is { } r
-            ? Ok(r) : NotFound();
-}
-
-public class Revenue_by_MonthController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.RevenueByMonth);
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.RevenueByMonth.FirstOrDefault(r => r.Id == key) is { } r
-            ? Ok(r) : NotFound();
-}
-
-public class Revenue_by_QuarterController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.RevenueByQuarter);
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.RevenueByQuarter.FirstOrDefault(r => r.Id == key) is { } r
-            ? Ok(r) : NotFound();
-}
-
-public class Revenue_by_YearController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.RevenueByYear);
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.RevenueByYear.FirstOrDefault(r => r.Id == key) is { } r
-            ? Ok(r) : NotFound();
-}
-
-public class KPI_SummaryController : ODataController
-{
-    [EnableQuery]
-    public IActionResult Get() => Ok(FinanceDataStore.KpiSummary);
-
-    [EnableQuery]
-    public IActionResult Get(string key) =>
-        FinanceDataStore.KpiSummary.FirstOrDefault(k => k.Id == key) is { } k
-            ? Ok(k) : NotFound();
 }
